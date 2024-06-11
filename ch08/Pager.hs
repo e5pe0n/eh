@@ -1,46 +1,9 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TypeApplications #-}
+module Pager where
 
-module HCat where
-
-import qualified Control.Exception as Exception
-import qualified Data.ByteString as BS
-import qualified Data.Text as Text
-import qualified Data.Text.IO as TextIO
-import qualified System.Environment as Env
+import Data.Text qualified as Text
 import System.IO
-import qualified System.IO.Error as IOError
-import qualified System.Info as SystemInfo
+import System.Info qualified as SystemInfo
 import System.Process (readProcess)
-
-runHCat :: IO ()
-runHCat =
-  handleIOError $
-    handleArgs
-      >>= eitherToErr
-      >>= flip openFile ReadMode
-      >>= TextIO.hGetContents
-      >>= \contents ->
-        getTerminalSize >>= \termSize ->
-          let pages = paginate termSize contents
-           in showPages pages
-  where
-    handleIOError :: IO () -> IO ()
-    handleIOError ioAction = Exception.catch ioAction $ \e -> putStrLn "I ran into an error: " >> print @IOError e
-
-handleArgs :: IO (Either String FilePath)
-handleArgs =
-  parseArgs <$> Env.getArgs
-  where
-    parseArgs argumentList =
-      case argumentList of
-        [fname] -> Right fname
-        [] -> Left "no filename provided"
-        _ -> Left "multiple files not supported"
-
-eitherToErr :: (Show a) => Either a b -> IO b
-eitherToErr (Right a) = return a
-eitherToErr (Left e) = Exception.throwIO . IOError.userError $ show e
 
 groupsOf :: Int -> [a] -> [[a]]
 groupsOf n [] = []
@@ -104,17 +67,13 @@ getContinue =
         'q' -> return Cancel
         _ -> getContinue
 
-clearScreen :: IO ()
-clearScreen =
-  BS.putStr "\^[[1J\^[[1;1H"
-
-showPages :: [Text.Text] -> IO ()
-showPages [] = return ()
-showPages (page : pages) =
-  clearScreen
-    >> TextIO.putStr page
+runHCat :: IO ()
+runHCat =
+  putStrLn "do you wan to Continue (space) or quit (q)"
     >> getContinue
-    >>= \input ->
-      case input of
-        Continue -> showPages pages
-        Cancel -> return ()
+    >>= \cont -> case cont of
+      Continue -> putStrLn "okay, continuing!" >> runHCat
+      Cancel -> putStrLn "goodbye!"
+
+-- main = print $ wordWrap 6 $ Text.pack "word wrapping is tricky"
+main = runHCat
